@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <title>Платформа за Внимание: Приобщаващи Истории</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    
+    <style>
+        :root { --main-blue: #00f2fe; --deep-blue: #4facfe; --accent-yellow: #ffd319; --wrong-red: #ff4d4d; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #0a0e17; font-family: 'Segoe UI', sans-serif; overflow: hidden; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+        .screen { position: fixed; inset: 0; background: #0a0e17; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; transition: 0.5s; overflow-y: auto; padding: 20px;}
+        .hidden { opacity: 0; pointer-events: none; z-index: -1; }
+        
+        .box { background: #11151f; border: 3px solid #00f2fe; padding: 30px; border-radius: 20px; max-width: 800px; width: 90%; box-shadow: 0 0 40px rgba(0, 242, 254, 0.2); max-height: 90vh; overflow-y: auto;}
+        h1 { color: var(--accent-yellow); font-size: 2.5em; margin-bottom: 15px; }
+        
+        input, select, textarea { width: 80%; padding: 15px; font-size: 18px; border-radius: 10px; border: 2px solid #00f2fe; background: rgba(0,0,0,0.4); color: white; margin-bottom: 15px; outline: none; }
+        button { background: #00f2fe; color: #000; padding: 15px 30px; font-size: 18px; border-radius: 50px; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; margin: 10px; }
+        button:hover { transform: scale(1.05); background: white; }
+        
+        .btn-secondary { background: transparent; border: 2px solid #00f2fe; color: #00f2fe; }
+        .btn-secondary:hover { background: rgba(0, 242, 254, 0.1); color: white; }
+        .btn-danger { background: #ff4d4d; color: white; border: none; padding: 8px 15px; font-size: 14px; border-radius: 10px; cursor: pointer; }
+        .btn-danger:hover { background: #ff1a1a; transform: scale(1.05); }
+        
+        .btn-hint { background: var(--deep-blue); color: white; border: none; font-size: 14px; padding: 10px 20px; opacity: 0.8; transition: 0.3s; }
+        .btn-hint:hover { opacity: 1; transform: scale(1.05); background: white; color: black;}
+
+        #teacher-btn { position: absolute; top: 20px; right: 20px; background: transparent; border: none; font-size: 30px; cursor: pointer; opacity: 0.4; transition: 0.3s; z-index: 10001; }
+        #teacher-btn:hover { opacity: 1; transform: scale(1.2); }
+        
+        .form-group { text-align: left; margin-bottom: 15px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; }
+        .form-group label { display: block; margin-bottom: 5px; color: #00f2fe; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; box-sizing: border-box; }
+        
+        #story-list { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin-top: 20px; }
+        .story-card { position: relative; background: rgba(0,242,254,0.1); border: 2px solid #00f2fe; padding: 20px; border-radius: 15px; width: 200px; cursor: pointer; transition: 0.3s; }
+        .story-card:hover { background: rgba(0,242,254,0.3); transform: translateY(-5px); }
+
+        #split-stage { display: none; position: absolute; inset: 0; width: 100%; height: 100%; z-index: 5; }
+        #split-left { position: absolute; left: 0; width: 50%; height: 100%; background: #080c14; border-right: 4px solid var(--accent-yellow); display: flex; flex-direction: column; align-items: center; justify-content: center; transition: filter 0.3s; }
+        #split-right { position: absolute; right: 0; width: 50%; height: 100%; background: #0a0e17; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .distracted-blur { filter: grayscale(100%) blur(5px) brightness(0.5); }
+        
+        #puzzle-container { width: 600px; height: 600px; display: grid; gap: 2px; background-size: cover; background-position: center; border: 8px solid white; border-radius: 15px; overflow: hidden; position: relative; box-shadow: 0 0 30px rgba(255,255,255,0.1);}
+        .puzzle-piece { background: #1a2128; width: 100%; height: 100%; transition: 0.8s; border: 1px solid rgba(255,255,255,0.1); }
+        .piece-revealed { opacity: 0; transform: scale(0.5) rotate(10deg); pointer-events: none; }
+
+        /* ОРИГИНАЛНИЯТ ПАЗИТЕЛ (ВЗЕТ ОТ FOCUS.HTML) */
+        #guardian { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 260px; height: 260px; background: #33ccff; border-radius: 50% 45% 55% 45% / 55% 45% 50% 50%; box-shadow: 0 0 60px rgba(51, 204, 255, 0.4); display: none; flex-direction: column; justify-content: center; align-items: center; transition: all 0.5s ease-in-out; z-index: 9999; pointer-events: none; }
+        .eyes { display: flex; gap: 35px; margin-top: 10px; }
+        .eye { width: 45px; height: 45px; background: white; border-radius: 50%; position: relative; transition: background 0.2s, height 0.3s; animation: blink 6.5s infinite; }
+        .pupil { width: 22px; height: 22px; background: #1a2128; border-radius: 50%; position: absolute; top: 12px; left: 11px; transition: 0.1s ease; }
+        .pupil::after { content: ''; position: absolute; top: 3px; left: 4px; width: 8px; height: 8px; background: white; border-radius: 50%; opacity: 0.9; }
+        .mouth { width: 35px; height: 15px; border-bottom: 5px solid #1a2128; border-radius: 0 0 35px 35px; background: transparent; margin-top: 15px; transition: 0.3s; }
+        @keyframes blink { 0%, 94%, 98%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+
+        /* МАГИЧЕСКА КНИГА */
+        #magic-book-container { position: absolute; bottom: -180px; left: 50%; transform: translateX(-50%); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 11; }
+        #magic-book { width: 150px; height: auto; filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.2)); transition: 0.3s; }
+        .active-book #magic-book { filter: drop-shadow(0 0 30px var(--main-blue)) drop-shadow(0 0 60px var(--accent-yellow)); animation: floatBook 2s infinite alternate ease-in-out; }
+        @keyframes floatBook { 0% { transform: translateY(0px); } 100% { transform: translateY(-15px); } }
+
+        /* ЗВУКОВИ ВЪЛНИ ОТ КНИГАТА */
+        .waves-container { position: absolute; top: -30px; display: none; }
+        .active-book .waves-container { display: block; }
+        .wave { position: absolute; border: 3px solid var(--accent-yellow); border-radius: 50%; opacity: 0; animation: soundWaves 2s infinite ease-out; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+        .wave1 { width: 40px; height: 20px; animation-delay: 0s; }
+        .wave2 { width: 80px; height: 40px; animation-delay: 0.6s; }
+        .wave3 { width: 120px; height: 60px; animation-delay: 1.2s; }
+        @keyframes soundWaves { 0% { width: 20px; height: 10px; opacity: 1; transform: translate(-50%, -50%) translateY(0); } 100% { width: 180px; height: 90px; opacity: 0; transform: translate(-50%, -50%) translateY(-60px); } }
+
+        /* ТЕСТ И ЖОКЕРИ */
+        #quiz-screen { display: none; position: absolute; inset: 0; background: #0a0e17; z-index: 20; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px;}
+        .quiz-btn { background: rgba(0, 242, 254, 0.1); border: 2px solid var(--main-blue); color: white; padding: 20px; font-size: 1.2em; border-radius: 15px; cursor: pointer; transition: 0.3s; width: 450px; margin: 10px; pointer-events: auto; }
+        .quiz-btn:hover { background: var(--main-blue); color: black; }
+        .correct { background: #32ff7e !important; color: black !important; }
+        .wrong { background: var(--wrong-red) !important; color: white !important; }
+
+        #read-hint-box { display: none; position: absolute; top: 50px; left: 50%; transform: translateX(-50%); background: #11151f; border: 2px solid var(--accent-yellow); padding: 20px; border-radius: 15px; max-width: 600px; width: 90%; z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,0.8); pointer-events: auto; }
+
+        /* ТАБЛИЦА ЗА СТАТИСТИКА */
+        .stats-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 1.1em; color: white; }
+        .stats-table th, .stats-table td { border: 1px solid rgba(0, 242, 254, 0.3); padding: 12px; text-align: center; }
+        .stats-table th { background: rgba(0, 242, 254, 0.1); color: var(--accent-yellow); }
+
+        video { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="guardian">
+        <div class="eyes">
+            <div class="eye"><div class="pupil" id="pupil-l"></div></div>
+            <div class="eye"><div class="pupil" id="pupil-r"></div></div>
+        </div>
+        <div class="mouth" id="mouth"></div>
+        
+        <div id="magic-book-container">
+            <div class="waves-container">
+                <div class="wave wave1"></div>
+                <div class="wave wave2"></div>
+                <div class="wave wave3"></div>
+            </div>
+            <img id="magic-book" src="book.png" alt="Вълшебна Книга">
+        </div>
+    </div>
+
+    <button id="teacher-btn" title="Учителски Панел">⚙️</button>
+
+    <div id="intro-screen" class="screen">
+        <div class="box">
+            <h1>Магически Тренажор</h1>
+            <p style="font-size: 1.2em; margin-bottom: 20px;">Готов ли си да слушаш внимателно?</p>
+            
+            <input type="text" id="child-name" list="known-names" placeholder="Въведи своето име..." autocomplete="off">
+            <datalist id="known-names"></datalist> <br>
+            
+            <button id="start-btn">СТАРТ</button>
+            <button id="stats-btn" class="btn-secondary">СТАТИСТИКА</button>
+        </div>
+        
+        <div style="position: absolute; bottom: 20px; font-size: 0.9em; color: rgba(255,255,255,0.4); letter-spacing: 1px;">
+            Автор: Дочка Кючукова
+        </div>
+    </div>
+
+    <div id="stats-screen" class="screen hidden">
+        <div class="box" style="max-width: 800px;">
+            <h1>📊 Дневник на Вниманието</h1>
+            <p>Изберете дете от списъка, за да видите резултатите му:</p>
+            <select id="stats-name-select" onchange="loadStatsForName()">
+                <option value="">-- Избери дете --</option>
+            </select>
+            <div id="stats-table-container" style="max-height: 400px; overflow-y: auto;"></div>
+            <br>
+            <button onclick="closeStats()">НАЗАД</button>
+        </div>
+    </div>
+
+    <div id="main-menu" class="screen hidden">
+        <div class="box">
+            <h1>Библиотека с Приказки</h1>
+            <p>Избери си вълшебна история!</p>
+            <div id="story-list"></div>
+            <p id="no-stories-msg" style="color: #ff4d4d; display: none;">Няма истории. Кликни върху зъбното колело (⚙️), за да добавиш.</p>
+        </div>
+    </div>
+
+    <div id="teacher-panel" class="screen hidden">
+        <div class="box" style="text-align: left; pointer-events: auto;">
+            <h2 style="color: var(--accent-yellow); text-align: center;">⚙️ Панел за Управление</h2>
+            
+            <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px; border: 1px solid var(--wrong-red); margin-bottom: 20px;">
+                <h3 style="color: #ff4d4d; margin-top: 0;">Редакция и Изтриване на истории</h3>
+                <div id="t-manage-list" style="max-height: 150px; overflow-y: auto;"></div>
+            </div>
+
+            <h3 style="color: #32ff7e;">Създаване / Обновяване на история</h3>
+            <div class="form-group">
+                <label>Заглавие на приказката</label>
+                <input type="text" id="t-title" placeholder="Име на бутона (напр. Златната рибка)">
+            </div>
+            <div class="form-group">
+                <label>АУДИО файл</label>
+                <input type="text" id="t-audio" placeholder="story1.mp3">
+            </div>
+            <div class="form-group">
+                <label>КАРТИНКА за пъзела</label>
+                <input type="text" id="t-image" placeholder="pic1.jpg">
+            </div>
+            <div class="form-group">
+                <label>Сложност на пъзела (Брой парчета)</label>
+                <select id="t-pieces">
+                    <option value="4">Много лесно (2x2 = 4 парчета)</option>
+                    <option value="9">Средно (3x3 = 9 парчета)</option>
+                    <option value="16" selected>Трудно (4x4 = 16 парчета)</option>
+                    <option value="25">Експерт (5x5 = 25 парчета)</option>
+                </select>
+            </div>
+
+            <h3 style="color: #00f2fe;">Тестови Въпроси към историята</h3>
+            <div id="questions-container"></div>
+            <button type="button" class="btn-secondary" onclick="addQuestionField()" style="margin-bottom: 20px;">➕ ДОБАВИ ОЩЕ ЕДИН ВЪПРОС</button>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="save-btn" onclick="saveStory()">ЗАПАЗИ ИСТОРИЯТА</button>
+                <button id="cancel-edit-btn" class="btn-danger" style="display:none; margin-right:10px;" onclick="resetForm()">ОТКАЗ ОТ РЕДАКЦИЯ</button>
+                <button class="btn-secondary" onclick="closeTeacherPanel()">НАЗАД</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="split-stage">
+        <div id="split-left">
+            <h2 style="color: #b838ff; margin-bottom: 20px;">Магическият Пъзел</h2>
+            <div id="puzzle-container"></div>
+            <p id="puzzle-hint" style="margin-top: 30px; font-size: 1.2em; color: #00f2fe;">Гледай тук!</p>
+        </div>
+        <div id="split-right">
+            <h2 id="listen-text" style="color: #00f2fe; margin-top: -300px; font-size: 2em; visibility: hidden;">Слушай внимателно...</h2>
+        </div>
+    </div>
+
+    <div id="read-hint-box">
+        <h3 style="color:var(--accent-yellow);">📖 Пазителят ти помага...</h3>
+        <p id="read-hint-text" style="font-size: 1.3em; line-height: 1.5; color: white;"></p>
+        <button class="btn-secondary" onclick="closeReadHint()">Разбрах!</button>
+    </div>
+
+    <div id="quiz-screen">
+        <h2 id="q-text" style="color: var(--accent-yellow); font-size: 2.2em; margin-bottom: 30px; pointer-events: auto;">Въпрос</h2>
+        <div id="q-options" style="display: flex; flex-direction: column; align-items: center; margin-bottom: 30px; pointer-events: auto;"></div>
+        
+        <h4 style="color:#aaa;">Имаш нужда от помощ?</h4>
+        <div style="display:flex; gap: 15px; pointer-events: auto;">
+                        <button class="btn-hint" id="hint-read-btn" onclick="hintReadText()">📖 Прочети откъса</button>
+            <button class="btn-hint" onclick="hintShowImage()">✨ Виж Картината пак</button>
+        </div>
+    </div>
+
+    <div id="end-screen" class="screen hidden">
+        <div class="box" style="pointer-events: auto;">
+            <h1 id="final-title" style="color: #32ff7e;">Край на приказката!</h1>
+            <h2 id="final-score"></h2>
+            
+            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin: 25px 0; border: 1px solid rgba(0,242,254,0.3);">
+                <h3 style="color: #00f2fe; margin-top: 0;">📊 Анализ на вниманието:</h3>
+                <p style="font-size: 1.3em; margin-bottom: 5px;">Ниво на фокус: <strong id="focus-percent" style="color:#32ff7e;"></strong></p>
+                <p id="distraction-time" style="color: #ff4d4d; font-size: 1em; margin-top: 5px;"></p>
+            </div>
+            
+            <button onclick="backToMenu()">ОБРАТНО В МЕНЮТО</button>
+        </div>
+    </div>
+
+    <video id="webcam" autoplay playsinline></video>
+
+<script>
+    // --- ПАМЕТ И ПРОМЕНЛИВИ ---
+    let storiesDB = [];
+    let editingIndex = -1; 
+    try {
+        let saved = localStorage.getItem('focus_stories');
+        if (saved) { storiesDB = JSON.parse(saved); }
+    } catch(e) { storiesDB = []; }
+    
+    let playerName = "";
+    let currentActiveStory = null;
+    let audioPlayer = new Audio();
+    let storyStartTime = 0;
+    let timePerPiece = 0;
+    let gameState = "STOPPED";
+    let piecesRevealed = 0, totalPieces = 16; 
+    let correctAnswers = 0;
+    let revealOrder = []; 
+    let currentQuestionIndex = 0; 
+    let finalFocusPercentage = 0;
+
+    // --- МОДУЛ ЗА СТАТИСТИКА ---
+    function updateNameLists() {
+        let history = JSON.parse(localStorage.getItem('magic_stories_stats') || '[]');
+        let uniqueNames = [...new Set(history.map(entry => entry.name))];
+        let datalist = document.getElementById('known-names');
+        let select = document.getElementById('stats-name-select');
+        datalist.innerHTML = '';
+        select.innerHTML = '<option value="">-- Избери дете --</option>';
+        uniqueNames.forEach(name => {
+            datalist.innerHTML += `<option value="${name}">`;
+            select.innerHTML += `<option value="${name}">${name}</option>`;
+        });
+    }
+
+    document.getElementById('stats-btn').onclick = function() {
+        updateNameLists();
+        document.getElementById('intro-screen').classList.add('hidden');
+        document.getElementById('stats-screen').classList.remove('hidden');
+    };
+
+    window.closeStats = function() {
+        document.getElementById('stats-screen').classList.add('hidden');
+        document.getElementById('intro-screen').classList.remove('hidden');
+    };
+
+    window.loadStatsForName = function() {
+        let selectedName = document.getElementById('stats-name-select').value;
+        let container = document.getElementById('stats-table-container');
+        if (!selectedName) { container.innerHTML = ''; return; }
+        
+        let history = JSON.parse(localStorage.getItem('magic_stories_stats') || '[]');
+        let childHistory = history.filter(entry => entry.name === selectedName);
+        
+        if (childHistory.length === 0) {
+            container.innerHTML = '<p>Няма записи за това дете.</p>'; return;
+        }
+        
+        let html = '<table class="stats-table"><tr><th>Дата и Час</th><th>История</th><th>Фокус</th><th>Тест</th></tr>';
+        childHistory.reverse().forEach(entry => {
+            let color = entry.focus >= 80 ? '#32ff7e' : (entry.focus >= 50 ? '#ffd319' : '#ff4d4d');
+            let testResult = entry.correct ? '✅ Справи се' : '❌ Грешки';
+            html += `<tr>
+                <td>${entry.date}</td>
+                <td>${entry.story}</td>
+                <td style="color:${color}; font-weight:bold; font-size:1.2em;">${entry.focus}%</td>
+                <td>${testResult}</td>
+            </tr>`;
+        });
+        html += '</table>';
+        container.innerHTML = html;
+    };
+
+    // --- ЛОГИКА ЗА НАЧАЛО И МЕНЮ ---
+    window.onload = function() {
+        updateNameLists();
+        document.getElementById('guardian').style.display = 'none';
+    };
+
+    document.getElementById('start-btn').onclick = function() {
+        playerName = document.getElementById('child-name').value.trim() || "Герой";
+        document.getElementById('intro-screen').classList.add('hidden');
+        loadMainMenu();
+        document.getElementById('main-menu').classList.remove('hidden');
+    };
+
+    function loadMainMenu() {
+        const list = document.getElementById('story-list');
+        list.innerHTML = '';
+        if (storiesDB.length === 0) {
+            document.getElementById('no-stories-msg').style.display = 'block';
+        } else {
+            document.getElementById('no-stories-msg').style.display = 'none';
+            storiesDB.forEach((story, index) => {
+                let btn = document.createElement('div');
+                btn.className = 'story-card';
+                btn.innerHTML = `<h3>${story.title}</h3><p>▶️ Играй</p>`;
+                btn.onclick = () => startGame(index);
+                list.appendChild(btn);
+            });
+        }
+    }
+
+    // --- УЧИТЕЛСКИ ПАНЕЛ ---
+    document.getElementById('teacher-btn').onclick = () => {
+        document.getElementById('intro-screen').classList.add('hidden');
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('teacher-panel').classList.remove('hidden');
+        resetForm(); 
+        loadManageList(); 
+    };
+
+    function closeTeacherPanel() {
+        document.getElementById('teacher-panel').classList.add('hidden');
+        if (playerName === "") { document.getElementById('intro-screen').classList.remove('hidden'); } 
+        else { document.getElementById('main-menu').classList.remove('hidden'); loadMainMenu(); }
+    }
+
+    function loadManageList() {
+        const list = document.getElementById('t-manage-list');
+        list.innerHTML = '';
+        if (storiesDB.length === 0) {
+            list.innerHTML = '<p style="color:#aaa;">Няма добавени истории.</p>';
+            return;
+        }
+        storiesDB.forEach((story, index) => {
+            let item = document.createElement('div');
+            item.style.display = 'flex'; item.style.justifyContent = 'space-between'; item.style.alignItems = 'center';
+            item.style.borderBottom = '1px solid #555'; item.style.padding = '10px 0';
+            item.innerHTML = `<span style="font-size:1.1em; color:white;">📖 ${story.title}</span>`;
+            
+            let btnGroup = document.createElement('div');
+            
+            let editBtn = document.createElement('button');
+            editBtn.className = 'btn-hint'; 
+            editBtn.style.marginRight = '10px';
+            editBtn.innerText = '✏️ Редактирай';
+            editBtn.onclick = () => editStory(index);
+
+            let delBtn = document.createElement('button');
+            delBtn.className = 'btn-danger';
+            delBtn.innerText = '🗑️ Изтрий';
+            delBtn.onclick = () => {
+                if(confirm(`Сигурен ли си, че искаш да изтриеш "${story.title}"?`)) {
+                    storiesDB.splice(index, 1);
+                    localStorage.setItem('focus_stories', JSON.stringify(storiesDB));
+                    if(editingIndex === index) resetForm();
+                    loadManageList(); 
+                }
+            };
+            btnGroup.appendChild(editBtn); btnGroup.appendChild(delBtn);
+            item.appendChild(btnGroup); list.appendChild(item);
+        });
+    }
+
+    function addQuestionField(qData = null) {
+        const container = document.getElementById('questions-container');
+        const qCount = container.children.length + 1;
+        const div = document.createElement('div');
+        div.className = 'form-group question-group';
+        div.style.border = '1px dashed #00f2fe';
+        div.style.position = 'relative';
+
+        div.innerHTML = `
+            <button type="button" title="Изтрий въпроса" style="position:absolute; top:5px; right:5px; background:#ff4d4d; color:white; border:none; border-radius:50%; width:25px; height:25px; cursor:pointer;" onclick="this.parentElement.remove()">❌</button>
+            <label style="color:#ffd319;">Въпрос ${qCount}</label>
+            <input type="text" class="q-text" placeholder="Задайте въпрос..." value="${qData ? qData.q : ''}">
+            <input type="text" class="q-a1" placeholder="ВЕРЕН Отговор" style="border-color: #32ff7e; margin-top:5px;" value="${qData ? qData.options[0] : ''}">
+            <input type="text" class="q-a2" placeholder="Грешен Отговор 1" style="margin-top:5px;" value="${qData ? qData.options[1] : ''}">
+            <input type="text" class="q-a3" placeholder="Грешен Отговор 2" style="margin-top:5px;" value="${qData && qData.options[2] ? qData.options[2] : ''}">
+            <label style="margin-top:10px;">Жокер (Подсказка)</label>
+            <textarea class="q-hint" placeholder="Кратък текст за помощ...">${qData ? (qData.texthint || '') : ''}</textarea>
+        `;
+        container.appendChild(div);
+    }
+
+    function resetForm() {
+        editingIndex = -1;
+        document.getElementById('t-title').value = '';
+        document.getElementById('t-audio').value = '';
+        document.getElementById('t-image').value = '';
+        document.getElementById('t-pieces').value = 16;
+        document.getElementById('questions-container').innerHTML = ''; 
+        addQuestionField(); 
+        document.getElementById('save-btn').innerText = "ЗАПАЗИ ИСТОРИЯТА";
+        document.getElementById('save-btn').style.background = "#00f2fe";
+        document.getElementById('cancel-edit-btn').style.display = "none";
+    }
+
+    function editStory(index) {
+        editingIndex = index;
+        let story = storiesDB[index];
+        document.getElementById('t-title').value = story.title;
+        document.getElementById('t-audio').value = story.audioFile;
+        document.getElementById('t-image').value = story.imageFile;
+        document.getElementById('t-pieces').value = story.pieces || 16;
+        
+        document.getElementById('questions-container').innerHTML = '';
+        let qArray = story.questions || [story.question]; 
+        qArray.forEach(q => addQuestionField(q));
+
+        document.getElementById('save-btn').innerText = "🔄 ОБНОВИ ИСТОРИЯТА";
+        document.getElementById('save-btn').style.background = "#ffd319"; 
+        document.getElementById('cancel-edit-btn').style.display = "inline-block";
+        document.getElementById('teacher-panel').scrollTo({ top: 200, behavior: 'smooth' });
+    }
+
+    function saveStory() {
+        let title = document.getElementById('t-title').value;
+        let audio = document.getElementById('t-audio').value;
+        let image = document.getElementById('t-image').value;
+        let piecesNum = parseInt(document.getElementById('t-pieces').value);
+        
+        let questionsArray = [];
+        document.querySelectorAll('.question-group').forEach(group => {
+            let q = group.querySelector('.q-text').value;
+            let a1 = group.querySelector('.q-a1').value;
+            let a2 = group.querySelector('.q-a2').value;
+            let a3 = group.querySelector('.q-a3').value;
+            let hint = group.querySelector('.q-hint').value;
+            if(q && a1) { questionsArray.push({ q: q, options: [a1, a2, a3], correctIndex: 0, texthint: hint }); }
+        });
+
+        if(!title || !audio || !image || questionsArray.length === 0) { alert("Попълнете заглавие, файлове и поне ЕДИН въпрос с верен отговор!"); return; }
+
+        let storyData = { title: title, audioFile: audio.trim(), imageFile: image.trim(), pieces: piecesNum, questions: questionsArray };
+        
+        if (editingIndex >= 0) { storiesDB[editingIndex] = storyData; alert("Историята е обновена успешно!"); } 
+        else { storiesDB.push(storyData); alert("Историята е добавена успешно!"); }
+        
+        localStorage.setItem('focus_stories', JSON.stringify(storiesDB));
+        resetForm(); loadManageList(); 
+    }
+
+    // --- ИГРОВА ЛОГИКА ---
+    function startGame(storyIndex) {
+        currentActiveStory = storiesDB[storyIndex];
+        const imgCheck = new Image();
+        imgCheck.onload = function() {
+            audioPlayer.src = currentActiveStory.audioFile;
+            audioPlayer.onloadedmetadata = function() {
+                totalPieces = currentActiveStory.pieces || 16; 
+                timePerPiece = audioPlayer.duration / totalPieces;
+                continueStart(document.getElementById('puzzle-container'));
+            };
+            audioPlayer.onerror = function() { alert(`ГРЕШКА: Аудиото "${currentActiveStory.audioFile}" не е намерено.`); location.reload(); };
+        };
+        imgCheck.onerror = function() { alert(`ГРЕШКА: Картината "${currentActiveStory.imageFile}" не е намерена!`); location.reload(); };
+        imgCheck.src = currentActiveStory.imageFile; 
+        
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('teacher-btn').style.display = 'none'; 
+    }
+
+    function shuffleArray(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; } }
+
+    function continueStart(puzzleContainer) {
+        puzzleContainer.innerHTML = '';
+        puzzleContainer.style.backgroundImage = `url('${currentActiveStory.imageFile}')`;
+        piecesRevealed = 0; 
+        
+        let cols = Math.sqrt(totalPieces);
+        puzzleContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        puzzleContainer.style.gridTemplateRows = `repeat(${cols}, 1fr)`;
+
+        for(let i=0; i<totalPieces; i++) {
+            let piece = document.createElement('div');
+            piece.className = 'puzzle-piece';
+            piece.id = 'piece-' + i;
+            puzzleContainer.appendChild(piece);
+        }
+
+        // РАЗБЪРКВАНЕ НА ПЪЗЕЛА
+        revealOrder = [];
+        for(let i=0; i<totalPieces; i++) { revealOrder.push(i); }
+        shuffleArray(revealOrder);
+
+        audioPlayer.onended = startQuiz;
+        document.getElementById('split-stage').style.display = 'flex';
+        
+        let guardian = document.getElementById('guardian');
+        guardian.style.display = 'flex'; guardian.style.left = '75%'; guardian.style.opacity = '1';
+        
+        document.getElementById('magic-book-container').style.display = 'flex';
+        document.getElementById('magic-book-container').classList.add('active-book');
+        
+        gameState = "STORY"; storyStartTime = Date.now(); 
+        let p = audioPlayer.play(); if(p !== undefined) p.catch(e => { console.error("Аудио грешка:", e); });
+    }
+
+    audioPlayer.ontimeupdate = function() {
+        if (gameState !== "STORY") return;
+        let expectedPieces = Math.floor(audioPlayer.currentTime / timePerPiece);
+        while (piecesRevealed < expectedPieces && piecesRevealed < totalPieces) {
+            let randomPieceId = revealOrder[piecesRevealed]; 
+            document.getElementById('piece-' + randomPieceId).classList.add('piece-revealed');
+            piecesRevealed++;
+        }
+    };
+
+    // --- ЛИЦЕВО РАЗПОЗНАВАНЕ ---
+    const faceMesh = new FaceMesh({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
+    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: false, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+
+    faceMesh.onResults((results) => {
+        if (gameState !== "STORY") return;
+        let isFocused = false;
+        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+            const nose = results.multiFaceLandmarks[0][1]; 
+            const leftEye = results.multiFaceLandmarks[0][33]; 
+            const rightEye = results.multiFaceLandmarks[0][263];
+            const turnAmount = ((nose.x - leftEye.x) / (rightEye.x - leftEye.x)) - 0.5;
+            const pupilOffset = turnAmount * -80; 
+            
+            document.getElementById('pupil-l').style.transform = `translateX(${pupilOffset}px)`;
+            document.getElementById('pupil-r').style.transform = `translateX(${pupilOffset}px)`;
+            if (Math.abs(turnAmount) < 0.20) { isFocused = true; }
+        } 
+
+        const splitLeft = document.getElementById('split-left');
+        const puzzleHint = document.getElementById('puzzle-hint');
+        const listenText = document.getElementById('listen-text');
+
+        if (isFocused) {
+            if (audioPlayer.paused && audioPlayer.currentTime > 0) { audioPlayer.play(); listenText.style.visibility = "hidden"; }
+            splitLeft.classList.remove('distracted-blur');
+            puzzleHint.textContent = "Продължавай да гледаш!"; puzzleHint.style.color = "#32ff7e";
+            document.getElementById('magic-book-container').classList.add('active-book');
+        } else {
+            if (!audioPlayer.paused) { audioPlayer.pause(); listenText.style.visibility = "visible"; }
+            splitLeft.classList.add('distracted-blur');
+            puzzleHint.textContent = "Погледни тук, за да продължим!"; puzzleHint.style.color = "#ff4d4d";
+            document.getElementById('magic-book-container').classList.remove('active-book');
+        }
+    });
+
+    // --- ТЕСТ И ЖОКЕРИ ---
+    function startQuiz() {
+        gameState = "QUIZ";
+        audioPlayer.pause();
+        audioPlayer.currentTime = 0; 
+
+        let totalRealTimeSeconds = (Date.now() - storyStartTime) / 1000;
+        let focusedTimeSeconds = audioPlayer.duration || 1; 
+        
+        finalFocusPercentage = Math.round((focusedTimeSeconds / totalRealTimeSeconds) * 100);
+        if(finalFocusPercentage > 100) finalFocusPercentage = 100;
+        let distractedSeconds = Math.round(totalRealTimeSeconds - focusedTimeSeconds);
+
+        document.getElementById('focus-percent').textContent = finalFocusPercentage + "%";
+        if(distractedSeconds > 2) {
+            document.getElementById('distraction-time').textContent = `Детето се е разсейвало общо ${distractedSeconds} секунди.`;
+        } else {
+            document.getElementById('distraction-time').textContent = `Перфектна концентрация!`;
+            document.getElementById('distraction-time').style.color = "#32ff7e";
+        }
+
+        document.getElementById('split-stage').style.display = 'none';
+        document.getElementById('quiz-screen').style.display = 'flex';
+        document.getElementById('guardian').style.display = 'none';
+        document.getElementById('magic-book-container').classList.remove('active-book');
+        
+        correctAnswers = 0;
+        currentQuestionIndex = 0; 
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        let qArray = currentActiveStory.questions || [currentActiveStory.question]; 
+        let qData = qArray[currentQuestionIndex];
+        
+        document.getElementById('q-text').innerHTML = `<span style="font-size:0.5em; color:#aaa;">Въпрос ${currentQuestionIndex + 1} от ${qArray.length}</span><br>${qData.q}`;
+        
+        if(!qData.texthint) { document.getElementById('hint-read-btn').style.display = 'none'; }
+        else { document.getElementById('hint-read-btn').style.display = 'block'; }
+
+        let optionsList = [ { text: qData.options[0], isCorrect: true }, { text: qData.options[1], isCorrect: false }, { text: qData.options[2], isCorrect: false } ].filter(opt => opt.text && opt.text.trim() !== ""); 
+        shuffleArray(optionsList);
+        const optionsContainer = document.getElementById('q-options'); optionsContainer.innerHTML = '';
+        
+        optionsList.forEach(opt => {
+            let btn = document.createElement('button'); btn.className = 'quiz-btn'; btn.textContent = opt.text;
+            btn.onclick = function() {
+                if(gameState !== "QUIZ") return;
+                document.querySelectorAll('.quiz-btn').forEach(b => b.style.pointerEvents = 'none');
+                
+                if (opt.isCorrect) { btn.classList.add('correct'); correctAnswers++; } 
+                else { btn.classList.add('wrong'); document.querySelectorAll('.quiz-btn').forEach(b => { if(b.textContent === qData.options[0]) b.classList.add('correct'); }); }
+                
+                setTimeout(() => {
+                    currentQuestionIndex++;
+                    if (currentQuestionIndex < qArray.length) { loadQuestion(); } else { endGame(); }
+                }, 2500); 
+            };
+            optionsContainer.appendChild(btn);
+        });
+    }
+
+    function hintReplayAudio() {
+        if(gameState !== "QUIZ") return;
+        audioPlayer.currentTime = Math.max(0, audioPlayer.duration - 10); 
+        audioPlayer.play();
+        let qArray = currentActiveStory.questions || [currentActiveStory.question];
+        let qData = qArray[currentQuestionIndex];
+        document.getElementById('q-text').textContent = "Слушай внимателно... 👀";
+        setTimeout(() => { 
+            audioPlayer.pause(); 
+            document.getElementById('q-text').innerHTML = `<span style="font-size:0.5em; color:#aaa;">Въпрос ${currentQuestionIndex + 1} от ${qArray.length}</span><br>${qData.q}`;
+        }, 11000);
+    }
+    function hintReadText() {
+        if(gameState !== "QUIZ") return;
+        let qArray = currentActiveStory.questions || [currentActiveStory.question];
+        document.getElementById('read-hint-text').textContent = qArray[currentQuestionIndex].texthint;
+        document.getElementById('read-hint-box').style.display = 'block';
+    }
+    function closeReadHint() { document.getElementById('read-hint-box').style.display = 'none'; }
+    function hintShowImage() {
+        if(gameState !== "QUIZ") return;
+        document.getElementById('quiz-screen').style.opacity = '0';
+        document.getElementById('split-stage').style.display = 'flex';
+        document.getElementById('puzzle-hint').textContent = "Припомни си вълшебната картина!";
+        document.getElementById('puzzle-hint').style.color = "white";
+        document.getElementById('split-right').style.display = 'none';
+        
+        setTimeout(() => {
+            document.getElementById('split-stage').style.display = 'none';
+            document.getElementById('quiz-screen').style.opacity = '1';
+            document.getElementById('split-right').style.display = 'flex';
+        }, 5000);
+    }
+
+    function endGame() {
+        gameState = "END";
+        audioPlayer.pause();
+        let qArray = currentActiveStory.questions || [currentActiveStory.question];
+        let totalQ = qArray.length;
+        
+        let history = JSON.parse(localStorage.getItem('magic_stories_stats') || '[]');
+        let currentDateTime = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
+        let allCorrect = (correctAnswers === totalQ);
+        history.push({ name: playerName, date: currentDateTime, story: currentActiveStory.title, focus: finalFocusPercentage, correct: allCorrect });
+        localStorage.setItem('magic_stories_stats', JSON.stringify(history));
+
+        document.getElementById('quiz-screen').style.display = 'none';
+        document.getElementById('end-screen').classList.remove('hidden');
+        
+        if (allCorrect) {
+            document.getElementById('final-title').textContent = "Поздравления!";
+            document.getElementById('final-score').innerHTML = `🎉 Перфектно! Позна ${correctAnswers} от ${totalQ}!`;
+            document.getElementById('final-score').style.color = "#32ff7e";
+        } else {
+            document.getElementById('final-title').textContent = "Край на теста!";
+            document.getElementById('final-score').innerHTML = `Позна ${correctAnswers} от общо ${totalQ} въпроса. Опитай пак!`;
+            document.getElementById('final-score').style.color = "#ffd319";
+        }
+    }
+
+    const videoElement = document.getElementById('webcam');
+    const camera = new Camera(videoElement, { onFrame: async () => { await faceMesh.send({image: videoElement}); }, width: 640, height: 480 });
+    camera.start().catch(error => { console.log("Камерата изчаква разрешение..."); });
+function backToMenu() {
+    // 1. Скриваме екрана с резултатите
+    document.getElementById('end-screen').classList.add('hidden');
+    
+    // 2. Гарантираме, че тестът и пъзелът са изключени
+    document.getElementById('quiz-screen').style.display = 'none';
+    document.getElementById('split-stage').style.display = 'none';
+    
+    // 3. Показваме директно библиотеката с приказките!
+    document.getElementById('main-menu').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
+
+ 
