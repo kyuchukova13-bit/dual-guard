@@ -184,6 +184,13 @@
             <h3 style="color: #00f2fe;">Тестови Въпроси към историята</h3>
             <div id="questions-container"></div>
             <button type="button" class="btn-secondary" onclick="addQuestionField()" style="margin-bottom: 20px;">➕ ДОБАВИ ОЩЕ ЕДИН ВЪПРОС</button>
+<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #4facfe;">
+    <button class="level-btn" onclick="exportStories()" style="background: #32ff7e; color: black;">💾 Изтегли историите (Export)</button>
+    
+    <button class="level-btn" onclick="document.getElementById('importFile').click()" style="background: #ffd319; color: black;">📂 Зареди истории (Import)</button>
+    
+    <input type="file" id="importFile" style="display: none;" accept=".json" onchange="importStories(event)">
+</div>
 
             <div style="text-align: center; margin-top: 20px;">
                 <button id="save-btn" onclick="saveStory()">ЗАПАЗИ ИСТОРИЯТА</button>
@@ -240,7 +247,27 @@
 
 <script>
     // --- ПАМЕТ И ПРОМЕНЛИВИ ---
-    let storiesDB = [];
+    // ТВОИТЕ 7 БАЗОВИ ИСТОРИИ
+let baseStories = [{"title":"Дворът на баба","audioFile":"1.mp3","imageFile":"pic.png","pieces":16,"questions":[{"q":"Какво носеше кокошката на главата си?","options":["Слънчеви очила","Шапка","Слушалки"],"correctIndex":0,"texthint":"Една кокошка претича покрай мен, но тя не гледаше накъде отива, защото носеше големи слънчеви очила"},{"q":"Кое животно летеше в небето?","options":["Прасето","Котката","Конят"],"correctIndex":0,"texthint":"Изведнъж нещо прелетя над главата ми – не беше птица, а едно розово прасе с крила."},{"q":"От какво беше направена оградата?","options":["От моливи","От тухли","От шоколад"],"correctIndex":0,"texthint":"Накрая се облегнах на оградата и видях, че тя не е от дърво, а е направена от цветни моливи."}]},{"title":"🎩 Магазинът за вълшебства","audioFile":"2.mp3","imageFile":"pic2.png","pieces":25,"questions":[{"q":"Какво имат обувките на рафта?","options":["Крила","Колела","Светлини"],"correctIndex":0,"texthint":"Погледни рафтовете – там има обувки, които не са за ходене, защото имат малки крила и могат да летят. "},{"q":"Кой е продавачът в магазина? ","options":["Слон ","Мечка ","Човек"],"correctIndex":0,"texthint":"Продавачът в магазина е много голям и сив – той е слон, който винаги носи елегантна розова папионка. "},{"q":"Какво носи роботът-клиент? ","options":["Чадър "," Раница ","Фенер"],"correctIndex":0,"texthint":"Днес е дошъл един клиент-робот, който много се страхува да не се намокри, затова държи отворен голям чадър вътре в магазина. "},{"q":"Какво има на пода вместо килим? ","options":["Езеро с патица ","Трева ","Пясък"],"correctIndex":0,"texthint":"А ако погледнеш към пода, ще видиш, че там няма килим, а има синьо езеро, в което плува една самотна гумена патица."}]},{"title":"Художникът в парка","audioFile":"3.mp3","imageFile":"pic3.png","pieces":16,"questions":[{"q":"С какво рисува художникът вместо с четка? ","options":["С морков ","С пръст ","С молив"],"correctIndex":0,"texthint":"Той обаче бил забравил четките си и затова рисувал върху платното с един дълъг оранжев морков. "},{"q":"Какъв цвят е катерицата в парка? ","options":["Лилава ","Кафява "," Оранжева"],"correctIndex":0,"texthint":"До него, в тревата, го наблюдавала една много странна катерица – тя не била рижава, а ярко лилава. "},{"q":"Какво носи слънцето на главата си? ","options":["Синя шапка ","Слънчеви очила "," Корона"],"correctIndex":0,"texthint":"Слънцето греело силно, но дори и то се пазело от горещината, като си било сложило голяма синя шапка. "},{"q":"Колко високи са цветята в този парк?","options":["Колкото дърветата ","Много ниски ","Колкото тревата"],"correctIndex":0,"texthint":"Художникът много обичал природата, затова нарисувал цветята толкова високи, колкото са дърветата."}]},{"title":"🚀 Космическият готвач","audioFile":"4.mp3","imageFile":"pic4.png","pieces":25,"questions":[{"q":"Колко планети с пръстени се виждат през прозореца?","options":["3","5","1"],"correctIndex":0,"texthint":"Ако погледнеш през илюминатора, ще видиш точно три планети, които имат красиви пръстени="},{"q":"Колко ръце има капитан Марс? ","options":["4","2","6"],"correctIndex":0,"texthint":"Самият капитан е много специален – той има цели четири ръце, за да може да бърка в много тенджери наведнъж. "},{"q":"Каква форма имат балончетата от супата? ","options":["Сърца","Звезди ","Кръгове"],"correctIndex":0,"texthint":"В най-голямата тенджера ври вълшебна супа, а балончетата, които излизат от нея, не са кръгли, а имат формата на малки сърца. "},{"q":"От какво е направена тортата?","options":[" От сирене"," От шоколад","От сладолед"],"correctIndex":0,"texthint":"За десерт Капитан Марс е подготвил голяма торта, но тя не е сладка, а е направена от жълто сирене с дупки. "}]},{"title":"Вълшебният мост на числата","audioFile":"5.mp3","imageFile":"pic5.png","pieces":25,"questions":[{"q":"Как е по-бързо да пресметнем 2 + 8?","options":["Започваме от 8 и добавяме 2","Започваме от 2 и броим 8 пъти","Нямаме право да разместваме."],"correctIndex":0,"texthint":"Но ако вземе голямата купчина от 8 камъка и просто добави 2 към нея – хоп! – мостът е готов веднага!"},{"q":"Ако Джуджето има 1 ябълка в едната кошничка и 9 в другата, от кое число ще го посъветваш да започне да брои, за да не загуби време?“","options":["От 9 ","От 1 ","От 0"],"correctIndex":0,"texthint":"Винаги кани голямото число първо на моста."}]},{"title":"Космическото броене","audioFile":"6.mp3","imageFile":"pic6.png","pieces":16,"questions":[{"q":"Какво се случва, когато добавим 1 към 9?","options":["Получаваме следващото число 10.","Получаваме 9","Получаваме 1"],"correctIndex":0,"texthint":"Когато добавяме 1, просто казваме следващото число"},{"q":"Какъв резултат ще се получи ако от 8 звезди в Космоса една падне и угасне?","options":["7 звезди","6 звезди","8 звезди"],"correctIndex":0,"texthint":"А когато една звезда угасне, изваждаме и се връщаме само една крачка назад към предишното число."}]},{"title":"Патицата Кваки ","audioFile":"7.mp3","imageFile":"pic7.png","pieces":25,"questions":[{"q":"Колко зърна царевица е имало в голямата купчина?","options":["седем","пет","две"],"correctIndex":0,"texthint":"Отишла първо при голямата купчина със седем зърна и просто добавила към тях двете калинки."},{"q":"Защо Кваки не започнала да брои от числото 2?","options":["Защото е по-бързо да започнеш от голямото число. ","Защото я мързяло.","Защото калинките избягали."],"correctIndex":0,"texthint":"Запомни трика на Кваки: Когато виждаш малко и голямо число, винаги отивай първо при голямото и добавяй малкото към него."},{"q":"Ако трябва да пресметнеш 3 + 6, от кое число ще започнеш, за да приложиш трика на Кваки?","options":["От шест","От три","От девет"],"correctIndex":0,"texthint":"Запомни трика на Кваки: Когато виждаш малко и голямо число, винаги отивай първо при голямото и добавяй малкото към него."}]}];
+
+let storiesDB = [];
+let saved = localStorage.getItem('focus_stories');
+
+// ИНТЕЛИГЕНТНО ЗАРЕЖДАНЕ:
+if (saved && saved !== "[]") {
+    let parsedSaved = JSON.parse(saved);
+    // Ако в паметта има повече истории от базовите (някой е добавил нова), зареждаме тях!
+    if (parsedSaved.length > baseStories.length) {
+        storiesDB = parsedSaved;
+    } else {
+        // Иначе винаги зареждаме 7-те базови
+        storiesDB = [...baseStories];
+        localStorage.setItem('focus_stories', JSON.stringify(storiesDB));
+    }
+} else {
+    storiesDB = [...baseStories];
+    localStorage.setItem('focus_stories', JSON.stringify(storiesDB));
+}
     let editingIndex = -1; 
     try {
         let saved = localStorage.getItem('focus_stories');
@@ -710,6 +737,52 @@ function backToMenu() {
     
     // 3. Показваме директно библиотеката с приказките!
     document.getElementById('main-menu').classList.remove('hidden');
+}
+// Функция за ИЗТЕГЛЯНЕ на историите
+function exportStories() {
+    let saved = localStorage.getItem('focus_stories');
+    if (!saved || saved === "[]") {
+        alert("Няма създадени истории за изтегляне!");
+        return;
+    }
+    
+    // Създаване на файл
+    let blob = new Blob([saved], { type: "application/json" });
+    let url = URL.createObjectURL(blob);
+    
+    // Автоматично изтегляне
+    let a = document.createElement('a');
+    a.href = url;
+    a.download = "Pazitel_Istorii.json"; // Името на файла
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+// Функция за ЗАХВАЩАНЕ (Импортиране) на истории
+function importStories(event) {
+    let file = event.target.files[0];
+    if (!file) return;
+
+    let reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            let importedData = JSON.parse(e.target.result);
+            
+            // Проверка дали файлът е правилен
+            if (Array.isArray(importedData)) {
+                localStorage.setItem('focus_stories', JSON.stringify(importedData));
+                storiesDB = importedData; // Обновяваме и текущия масив
+                alert("Успешно заредихте историите! Моля, презаредете страницата (F5).");
+                location.reload(); // Презарежда страницата, за да се покажат новите бутони
+            } else {
+                alert("Грешен формат на файла!");
+            }
+        } catch (error) {
+            alert("Възникна грешка при четенето на файла.");
+        }
+    };
+    reader.readAsText(file);
 }
 </script>
 </body>
